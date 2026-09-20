@@ -27,6 +27,7 @@ ADMIN_USERNAME = "지헌아사랑한다임마"
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_TITLE, MAX_BODY, MAX_COMMENT = 120, 10000, 2000
+CATEGORIES = ("질문", "공략", "공지", "제재로그", "자유게시판")
 NAME_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,24}$")
 ALLOWED_IMAGE_TYPES = {"JPEG", "PNG", "WEBP"}
 GUEST_COOKIE, CSRF_COOKIE, STAFF_COOKIE = "cat_hero_guest", "cat_hero_csrf", "cat_hero_staff"
@@ -51,6 +52,7 @@ class Post(Base):
     guest_id: Mapped[str] = mapped_column(String(64), index=True)
     nickname: Mapped[str] = mapped_column(String(24))
     title: Mapped[str] = mapped_column(String(MAX_TITLE))
+    category: Mapped[str] = mapped_column(String(16), default="자유게시판", index=True)
     body: Mapped[str] = mapped_column(Text)
     image_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     views: Mapped[int] = mapped_column(Integer, default=0)
@@ -86,6 +88,12 @@ class StaffSession(Base):
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        def migrate(sync_conn):
+            from sqlalchemy import inspect, text
+            columns = {c["name"] for c in inspect(sync_conn).get_columns("posts")}
+            if "category" not in columns:
+                sync_conn.execute(text("ALTER TABLE posts ADD COLUMN category VARCHAR(16) DEFAULT '자유게시판'"))
+        await conn.run_sync(migrate)
     async with SessionLocal() as db:
         staff = await db.scalar(select(Staff).where(Staff.username == ADMIN_USERNAME))
         if not staff:
@@ -229,14 +237,20 @@ async def save_image(upload):
     return name
 
 def post_dict(post: Post):
-    return {"id": post.id, "nickname": post.nickname, "title": post.title, "body": post.body,
+    return {"id": post.id, "nickname": post.nickname, "title": post.title, "category": post.category, "body": post.body,
             "image": f"/uploads/{post.image_name}" if post.image_name else None,
             "views": post.views, "created_at": post.created_at.isoformat()}
 
 async def api_posts(request: Request):
+    category = request.query_params.get("category", "전체")
     async with SessionLocal() as db:
-        total = await db.scalar(select(func.count(Post.id)))
-        rows = (await db.execute(select(Post).order_by(Post.id.desc()).limit(100))).scalars().all()
+        query = select(Post).order_by(Post.id.desc()).limit(100)
+        count_query = select(func.count(Post.id))
+        if category in CATEGORIES:
+            query = select(Post).where(Post.category == category).order_by(Post.id.desc()).limit(100)
+            count_query = select(func.count(Post.id)).where(Post.category == category)
+        total = await db.scalar(count_query)
+        rows = (await db.execute(query)).scalars().all()
         return JSONResponse({"posts": [post_dict(p) for p in rows], "total": total or 0})
 
 async def api_post(request: Request):
@@ -258,6 +272,9 @@ async def api_create_post(request: Request):
         return json_error("invalid request", 403)
     try:
         form = await request.form()
+        category = clean_text(str(form.get("category") or "자유게시판"), 16)
+        if category not in CATEGORIES:
+            return json_error("올바른 게시판을 선택하세요.")
         title = clean_text(str(form.get("title") or ""), MAX_TITLE)
         body = clean_text(str(form.get("body") or ""), MAX_BODY)
         image = await save_image(form.get("image"))
@@ -267,7 +284,7 @@ async def api_create_post(request: Request):
         return json_error("게시글을 처리하지 못했습니다.", 400)
     guest_id, nickname, _ = await current_identity(request)
     async with SessionLocal() as db:
-        post = Post(guest_id=guest_id, nickname=nickname, title=title, body=body, image_name=image)
+        post = Post(guest_id=guest_id, nickname=nickname, title=title, category=category, body=body, image_name=image)
         db.add(post)
         await db.commit()
         await db.refresh(post)
