@@ -31,6 +31,10 @@ NAME_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,24}$")
 ALLOWED_IMAGE_TYPES = {"JPEG", "PNG", "WEBP"}
 GUEST_COOKIE, CSRF_COOKIE, STAFF_COOKIE = "cat_hero_guest", "cat_hero_csrf", "cat_hero_staff"
 SESSION_MAX_AGE = 60 * 60 * 12
+RATE_WINDOW = 60
+LOGIN_LIMIT = 8
+WRITE_LIMIT = 12
+_rate = {}
 
 if not ADMIN_PASSWORD_HASH:
     raise RuntimeError("ADMIN_PASSWORD_HASH is required")
@@ -93,6 +97,23 @@ async def startup():
 
 def json_error(message: str, status: int = 400):
     return JSONResponse({"error": message}, status_code=status)
+
+def client_key(request: Request, prefix: str) -> str:
+    return prefix + ":" + (request.client.host if request.client else "unknown")
+
+def rate_limited(key: str, limit: int) -> bool:
+    now = datetime.now(timezone.utc).timestamp()
+    hits = [t for t in _rate.get(key, []) if now - t < RATE_WINDOW]
+    if len(hits) >= limit:
+        _rate[key] = hits
+        return True
+    hits.append(now)
+    _rate[key] = hits
+    if len(_rate) > 5000:
+        for k, v in list(_rate.items()):
+            if not v or now - v[-1] >= RATE_WINDOW:
+                _rate.pop(k, None)
+    return False
 
 def clean_text(value: str, limit: int) -> str:
     value = (value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
@@ -231,6 +252,8 @@ async def api_post(request: Request):
         return JSONResponse(data)
 
 async def api_create_post(request: Request):
+    if rate_limited(client_key(request, "post"), WRITE_LIMIT):
+        return json_error("요청이 너무 많습니다. 잠시 후 다시 시도하세요.", 429)
     if not csrf_ok(request) or not same_origin(request):
         return json_error("invalid request", 403)
     try:
@@ -251,6 +274,8 @@ async def api_create_post(request: Request):
         return JSONResponse(post_dict(post), status_code=201)
 
 async def api_create_comment(request: Request):
+    if rate_limited(client_key(request, "comment"), WRITE_LIMIT):
+        return json_error("요청이 너무 많습니다. 잠시 후 다시 시도하세요.", 429)
     if not csrf_ok(request) or not same_origin(request):
         return json_error("invalid request", 403)
     try:
@@ -269,6 +294,8 @@ async def api_create_comment(request: Request):
         return JSONResponse({"id": comment.id, "nickname": comment.nickname, "body": comment.body, "created_at": comment.created_at.isoformat()}, status_code=201)
 
 async def api_admin_login(request: Request):
+    if rate_limited(client_key(request, "login"), LOGIN_LIMIT):
+        return json_error("로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.", 429)
     try:
         data = await request.json()
         username = clean_text(str(data.get("username") or ""), 64)
@@ -287,6 +314,8 @@ async def api_admin_login(request: Request):
     return response
 
 async def api_admin_logout(request: Request):
+    if not csrf_ok(request) or not same_origin(request):
+        return json_error("invalid request", 403)
     token = request.cookies.get(STAFF_COOKIE)
     if token:
         async with SessionLocal() as db:
@@ -344,6 +373,8 @@ async def api_staff_role(request: Request):
         staff = await db.get(Staff, staff_id)
         if not staff:
             return json_error("계정을 찾을 수 없습니다.", 404)
+        if staff.username == ADMIN_USERNAME:
+            return json_error("기본 관리자 계정의 역할은 변경할 수 없습니다.", 403)
         staff.role = role
         await db.commit()
     return JSONResponse({"ok": True})
@@ -354,6 +385,17 @@ async def api_admin_posts(request: Request):
     async with SessionLocal() as db:
         rows = (await db.execute(select(Post).order_by(Post.id.desc()).limit(100))).scalars().all()
         return JSONResponse({"posts": [post_dict(p) for p in rows]})
+
+async def api_admin_delete_comment(request: Request):
+    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request):
+        return json_error("forbidden", 403)
+    async with SessionLocal() as db:
+        comment = await db.get(Comment, int(request.path_params["comment_id"]))
+        if not comment:
+            return json_error("댓글을 찾을 수 없습니다.", 404)
+        await db.delete(comment)
+        await db.commit()
+    return JSONResponse({"ok": True})
 
 async def api_admin_delete_post(request: Request):
     if not csrf_ok(request) or not same_origin(request) or not await require_staff(request):
@@ -391,6 +433,7 @@ routes = [
     Route("/api/admin/staff/{staff_id:int}/role", api_staff_role, methods=["POST"]),
     Route("/api/admin/posts", api_admin_posts),
     Route("/api/admin/posts/{post_id:int}", api_admin_delete_post, methods=["DELETE"]),
+    Route("/api/admin/comments/{comment_id:int}", api_admin_delete_comment, methods=["DELETE"]),
     Mount("/assets", app=StaticFiles(directory=STATIC_DIR / "assets"), name="assets"),
     Mount("/uploads", app=StaticFiles(directory=UPLOAD_DIR), name="uploads"),
 ]
