@@ -1,3 +1,4 @@
+import contextlib
 import os
 import re
 import secrets
@@ -9,6 +10,9 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.applications import Starlette
+from starlette.routing import Mount
+from webapp import startup as web_startup, web_app
 
 TOKEN = os.environ.get("MCP_TOKEN")
 if not TOKEN:
@@ -110,4 +114,20 @@ mcp_app = mcp.streamable_http_app(
     transport_security=security,
 )
 
-app = HealthMiddleware(BearerAuthMiddleware(mcp_app))
+@contextlib.asynccontextmanager
+async def lifespan(_app):
+    async with mcp.session_manager.run():
+        await web_startup()
+        yield
+
+app = HealthMiddleware(
+    BearerAuthMiddleware(
+        Starlette(
+            routes=[
+                Mount("/mcp", app=mcp_app),
+                Mount("/", app=web_app),
+            ],
+            lifespan=lifespan,
+        )
+    )
+)
