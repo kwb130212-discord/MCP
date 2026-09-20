@@ -125,7 +125,7 @@ app = HealthMiddleware(
         Starlette(
             routes=[
                 *web_app.routes,
-                Mount("/", app=mcp_app),
+                *([Mount("/", app=mcp_app)] if TOKEN else []),
             ],
             lifespan=lifespan,
         )
