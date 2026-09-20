@@ -1,0 +1,19 @@
+[Unit]
+Description=VPS MCP Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/vps-mcp
+EnvironmentFile=/etc/vps-mcp.env
+ExecStart=/opt/vps-mcp/.venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
