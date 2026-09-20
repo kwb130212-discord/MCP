@@ -95,3 +95,32 @@ Clients authenticate with:
     sudo journalctl -u vps-mcp -n 100 --no-pager
 
 The server code uses the current MCP Python SDK v2 API, including MCPServer and streamable_http_app().
+
+
+## Cat Hero 960 서버 게시판
+
+루트(`/`)에 게스트 기반 커뮤니티 게시판이 포함되어 있습니다.
+
+- 로그인 없이 임시 게스트 ID + 임시 닉네임 사용
+- 닉네임 1~24자
+- 게시글/댓글
+- JPG/PNG/WEBP 이미지 업로드, 10MB 제한
+- 업로드 이미지는 서버에서 Pillow로 실제 이미지 검증 후 JPEG로 재인코딩
+- 원본 파일명은 저장하지 않고 랜덤 UUID 파일명 사용
+- 프론트엔드 출력은 HTML escape 처리
+- 상태 변경 요청에는 Same-Origin 검사 + CSRF 토큰 적용
+- 데이터 접근은 SQLAlchemy ORM의 바인드 파라미터를 사용하므로 사용자 입력을 SQL 문자열에 직접 연결하지 않음
+
+### 데이터베이스
+
+개발/단일 VPS 테스트는 SQLite(sqlite+aiosqlite)로 바로 시작할 수 있습니다. 실제 공개 게시판 운영은 PostgreSQL 17을 권장합니다. 동시 접속, 백업, 인덱스 관리, 장애 대응을 고려하면 SQLite보다 운영 DB로 적합합니다.
+
+환경변수 예: DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:5432/DBNAME
+
+docker-compose.yml에는 PostgreSQL 17 + 앱 구성을 함께 넣어 두었습니다. 실제 배포 전에는 예시 비밀번호를 반드시 강한 비밀값으로 교체하고 저장소에 실제 비밀번호를 커밋하지 마세요.
+
+### 보안 범위
+
+SQL Injection만 막는 것으로 공개 게시판 보안이 끝나는 것은 아닙니다. 현재 기본 방어는 SQLAlchemy 파라미터 바인딩, XSS 출력 이스케이프, CSRF, Same-Origin 검사, 이미지 MIME/실제 포맷 검증, 이미지 크기 제한, 랜덤 저장명입니다.
+
+운영 전에는 관리자 인증/삭제 기능, IP/게스트 기반 rate limit, 신고/차단, DB migration(Alembic), 이미지 저장소 분리 및 자동 백업을 추가하는 것을 권장합니다.
