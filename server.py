@@ -15,8 +15,6 @@ from starlette.routing import Mount
 from webapp import startup as web_startup, web_app
 
 TOKEN = os.environ.get("MCP_TOKEN")
-if not TOKEN:
-    raise RuntimeError("MCP_TOKEN is required")
 
 ALLOWED_HOSTS = [x.strip() for x in os.environ.get("MCP_ALLOWED_HOSTS", "127.0.0.1:*").split(",") if x.strip()]
 ALLOWED_ORIGINS = [x.strip() for x in os.environ.get("MCP_ALLOWED_ORIGINS", "http://127.0.0.1:*").split(",") if x.strip()]
