@@ -4,6 +4,7 @@ import subprocess
 from typing import Iterable
 
 from mcp.server import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -90,13 +91,15 @@ def recent_logs(service: str, lines: int = 100) -> str:
     lines = max(1, min(lines, 500))
     return run_command(["journalctl", "-u", validate_service(service), "-n", str(lines), "--no-pager", "--output=short-iso"])
 
+security = TransportSecuritySettings(
+    allowed_hosts=ALLOWED_HOSTS,
+    allowed_origins=ALLOWED_ORIGINS,
+)
+
 app = BearerAuthMiddleware(
     mcp.streamable_http_app(
         json_response=True,
         stateless_http=True,
-        transport_security={
-            "allowed_hosts": ALLOWED_HOSTS,
-            "allowed_origins": ALLOWED_ORIGINS,
-        },
+        transport_security=security,
     )
 )
