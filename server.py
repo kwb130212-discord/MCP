@@ -124,8 +124,8 @@ app = HealthMiddleware(
     BearerAuthMiddleware(
         Starlette(
             routes=[
-                Mount("/mcp", app=mcp_app),
-                Mount("/", app=web_app),
+                *web_app.routes,
+                Mount("/", app=mcp_app),
             ],
             lifespan=lifespan,
         )
