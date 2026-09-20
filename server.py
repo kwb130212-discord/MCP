@@ -1,4 +1,5 @@
 import os
+import re
 import secrets
 import subprocess
 from typing import Iterable
@@ -7,7 +8,7 @@ from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 
 TOKEN = os.environ.get("MCP_TOKEN")
 if not TOKEN:
@@ -15,6 +16,7 @@ if not TOKEN:
 
 ALLOWED_HOSTS = [x.strip() for x in os.environ.get("MCP_ALLOWED_HOSTS", "127.0.0.1:*").split(",") if x.strip()]
 ALLOWED_ORIGINS = [x.strip() for x in os.environ.get("MCP_ALLOWED_ORIGINS", "http://127.0.0.1:*").split(",") if x.strip()]
+SERVICE_RE = re.compile(r"^[A-Za-z0-9_.:@-]+$")
 
 mcp = MCPServer("VPS Management")
 
@@ -27,11 +29,17 @@ def run_command(args: Iterable[str], timeout: int = 30) -> str:
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.path == "/mcp":
+        if request.url.path.rstrip("/") == "/mcp":
             header = request.headers.get("authorization", "")
             scheme, _, value = header.partition(" ")
-            if scheme.lower() != "bearer" or not value or not secrets.compare_digest(value, TOKEN):
+            if scheme.lower() != "bearer" or not value or not secrets.compare_digest(value.strip(), TOKEN):
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
+
+class HealthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path == "/healthz":
+            return PlainTextResponse("ok")
         return await call_next(request)
 
 @mcp.tool()
@@ -71,7 +79,7 @@ def process_list(limit: int = 30) -> str:
     return run_command(["bash", "-lc", f"ps -eo pid,user,stat,%cpu,%mem,etime,cmd --sort=-%cpu | head -n {limit + 1}"])
 
 def validate_service(service: str) -> str:
-    if not service or not service.replace("-", "").replace("_", "").replace(".", "").replace("@", "").replace(":", "").isalnum():
+    if not service or len(service) > 256 or not SERVICE_RE.fullmatch(service):
         raise ValueError("invalid service name")
     return service
 
@@ -96,10 +104,10 @@ security = TransportSecuritySettings(
     allowed_origins=ALLOWED_ORIGINS,
 )
 
-app = BearerAuthMiddleware(
-    mcp.streamable_http_app(
-        json_response=True,
-        stateless_http=True,
-        transport_security=security,
-    )
+mcp_app = mcp.streamable_http_app(
+    json_response=True,
+    stateless_http=True,
+    transport_security=security,
 )
+
+app = HealthMiddleware(BearerAuthMiddleware(mcp_app))
