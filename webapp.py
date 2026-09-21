@@ -22,7 +22,9 @@ STATIC_DIR = BASE_DIR / "web"
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", str(BASE_DIR / "uploads")))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./board.db")
+DATABASE_URL = os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or "sqlite+aiosqlite:///./board.db"
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "")
 ADMIN_USERNAME = "지헌아사랑한다임마"
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
