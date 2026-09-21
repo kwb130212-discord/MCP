@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Boolean, select, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Boolean, JSON, select, func
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from starlette.applications import Starlette
@@ -163,6 +163,52 @@ async def api_support_account(request: Request):
             return json_error("계정 보안키 설정을 확인하세요.", 500)
         return JSONResponse({"account": {"username": username, "password": password}})
 
+async def api_support_macro(request: Request):
+    supporter = await current_supporter(request)
+    if not supporter:
+        return json_error("supporter unauthorized", 401)
+    if not supporter.macro_enabled:
+        return json_error("매크로 권한이 비활성화되어 있습니다.", 403)
+    async with SessionLocal() as db:
+        config = await db.get(MacroConfig, supporter.id)
+        if not config:
+            return JSONResponse({"macro": {"steps": [], "repeat_count": 10, "interval_ms": 1000}})
+        return JSONResponse({"macro": {"steps": config.steps, "repeat_count": config.repeat_count, "interval_ms": config.interval_ms}})
+
+async def api_support_macro_save(request: Request):
+    supporter = await current_supporter(request)
+    if not supporter:
+        return json_error("supporter unauthorized", 401)
+    if not supporter.macro_enabled:
+        return json_error("매크로 권한이 비활성화되어 있습니다.", 403)
+    if not csrf_ok(request) or not same_origin(request):
+        return json_error("invalid request", 403)
+    try:
+        data = await request.json()
+        raw_steps = data.get("steps") or []
+        if not isinstance(raw_steps, list) or len(raw_steps) > 100:
+            raise ValueError
+        steps = []
+        for raw in raw_steps:
+            if not isinstance(raw, dict):
+                raise ValueError
+            selector = clean_text(str(raw.get("selector") or ""), 500)
+            delay = max(100, min(60000, int(raw.get("delay") or 1000)))
+            steps.append({"selector": selector, "delay": delay})
+        repeat_count = max(1, min(10000, int(data.get("repeat_count") or 10)))
+        interval_ms = max(100, min(60000, int(data.get("interval_ms") or 1000)))
+    except Exception:
+        return json_error("매크로 설정을 확인하세요.")
+    async with SessionLocal() as db:
+        config = await db.get(MacroConfig, supporter.id)
+        if config:
+            config.steps, config.repeat_count, config.interval_ms = steps, repeat_count, interval_ms
+            config.updated_at = datetime.now(timezone.utc)
+        else:
+            db.add(MacroConfig(supporter_id=supporter.id, steps=steps, repeat_count=repeat_count, interval_ms=interval_ms))
+        await db.commit()
+    return JSONResponse({"ok": True})
+
 async def api_support_logout(request: Request):
     if not csrf_ok(request) or not same_origin(request):
         return json_error("invalid request", 403)
@@ -233,6 +279,14 @@ async def api_admin_supporter_toggle(request: Request):
         supporter.active = active
         await db.commit()
     return JSONResponse({"ok": True})
+
+class MacroConfig(Base):
+    __tablename__ = "macro_configs"
+    supporter_id: Mapped[int] = mapped_column(ForeignKey("supporters.id", ondelete="CASCADE"), primary_key=True)
+    steps: Mapped[list] = mapped_column(JSON, default=list)
+    repeat_count: Mapped[int] = mapped_column(Integer, default=10)
+    interval_ms: Mapped[int] = mapped_column(Integer, default=1000)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class StaffSession(Base):
     __tablename__ = "staff_sessions"
@@ -597,6 +651,8 @@ routes = [
     Route("/api/support/logout", api_support_logout, methods=["POST"]),
     Route("/api/support/me", api_support_me),
     Route("/api/support/account", api_support_account),
+    Route("/api/support/macro", api_support_macro),
+    Route("/api/support/macro", api_support_macro_save, methods=["POST"]),
     Route("/api/nickname", api_set_nickname, methods=["POST"]),
     Route("/api/posts", api_posts),
     Route("/api/posts", api_create_post, methods=["POST"]),
