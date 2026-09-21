@@ -22,11 +22,12 @@ STATIC_DIR = BASE_DIR / "web"
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", str(BASE_DIR / "uploads")))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-DATABASE_URL = os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or "sqlite+aiosqlite:///./board.db"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "")
-ADMIN_USERNAME = "지헌아사랑한다임마"
+DATABASE_URL = os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL", "")
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "지헌아사랑한다임마")
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_TITLE, MAX_BODY, MAX_COMMENT = 120, 10000, 2000
 CATEGORIES = ("질문", "공략", "공지", "제재로그", "자유게시판")
@@ -39,10 +40,15 @@ LOGIN_LIMIT = 8
 WRITE_LIMIT = 12
 _rate = {}
 
-if not ADMIN_PASSWORD_HASH:
-    raise RuntimeError("ADMIN_PASSWORD_HASH is required")
+if not DATABASE_URL:
+    raise RuntimeError("SUPABASE_DB_URL or DATABASE_URL is required")
+if not ADMIN_PASSWORD_HASH and not ADMIN_PASSWORD:
+    raise RuntimeError("ADMIN_PASSWORD_HASH or ADMIN_PASSWORD is required")
 
-engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
+_engine_kwargs = {"pool_pre_ping": True}
+if ":6543/" in DATABASE_URL:
+    _engine_kwargs["connect_args"] = {"statement_cache_size": 0}
+engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 class Base(DeclarativeBase):
@@ -298,6 +304,7 @@ class StaffSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 async def startup():
+    configured_hash = ADMIN_PASSWORD_HASH or hash_password(ADMIN_PASSWORD)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         def migrate(sync_conn):
@@ -309,7 +316,7 @@ async def startup():
     async with SessionLocal() as db:
         staff = await db.scalar(select(Staff).where(Staff.username == ADMIN_USERNAME))
         if not staff:
-            db.add(Staff(username=ADMIN_USERNAME, password_hash=ADMIN_PASSWORD_HASH, role="admin"))
+            db.add(Staff(username=ADMIN_USERNAME, password_hash=configured_hash, role="admin"))
             await db.commit()
         elif staff.role != "admin" or not staff.active:
             staff.role, staff.active = "admin", True
