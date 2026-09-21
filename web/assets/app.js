@@ -48,15 +48,18 @@ let macroTimer=null,macroRunning=false;
 function openMacroSettings(){
   $("#supportPanel").innerHTML='<div class="dialogHead"><div><p class="eyebrow">CAT HERO MACRO</p><h2>웹 매크로</h2></div><button class="x" data-close>×</button></div><div class="macroGrid"><label>반복 간격(ms)<input id="macroInterval" type="number" min="100" max="60000" value="1000"></label><label>반복 횟수<input id="macroRepeat" type="number" min="1" max="10000" value="10"></label></div><div class="macroSteps" id="macroSteps"></div><button class="ghost" id="addMacroStep">＋ 클릭 대상 추가</button><div class="actions"><button class="ghost" id="macroReset">초기화</button><button class="ghost" id="macroStop">중지</button><button class="primary" id="macroSave">저장</button><button class="primary" id="macroStart">실행</button></div><p class="muted">현재 페이지에서 지정한 CSS 선택자를 순서대로 클릭합니다. 외부 도메인 게임이나 Canvas 내부 클릭은 브라우저 보안상 이 페이지에서 직접 제어할 수 없습니다.</p>';
   const steps=$("#macroSteps");
-  let list=JSON.parse(localStorage.getItem("cat-macro-steps")||"[]");
+  let list=[];
+  let macroLoaded=false;
   const render=()=>{steps.innerHTML=list.map((x,i)=>'<div class="macroStep"><b>'+(i+1)+'</b><input class="macroSelector" value="'+esc(x.selector||"")+'" placeholder="예: #startButton"><input class="macroDelay" type="number" value="'+(x.delay||1000)+'" min="100" max="60000"><button class="danger" onclick="removeMacroStep('+i+')">삭제</button></div>').join("")||'<div class="card">클릭 대상을 추가하세요.</div>'};
+  const loadMacro=async()=>{try{const d=await api("/api/support/macro");list=Array.isArray(d.macro?.steps)?d.macro.steps:[];$("#macroRepeat").value=d.macro?.repeat_count||10;$("#macroInterval").value=d.macro?.interval_ms||1000;macroLoaded=true;render()}catch(e){toast(e.message)}};
   window.removeMacroStep=i=>{list.splice(i,1);render()};
   $("#addMacroStep").onclick=()=>{list.push({selector:"",delay:1000});render()};
-  $("#macroReset").onclick=()=>{list=[];render()};
-  $("#macroSave").onclick=()=>{list=[...document.querySelectorAll(".macroStep")].map((el,i)=>({selector:el.querySelector(".macroSelector").value.trim(),delay:Math.max(100,Math.min(60000,Number(el.querySelector(".macroDelay").value)||1000))})).filter(x=>x.selector);localStorage.setItem("cat-macro-steps",JSON.stringify(list));toast("매크로 저장 완료");render()};
+  $("#macroReset").onclick=()=>{list=[];$("#macroRepeat").value=10;$("#macroInterval").value=1000;render()};
+  $("#macroSave").onclick=async()=>{list=[...document.querySelectorAll(".macroStep")].map(el=>({selector:el.querySelector(".macroSelector").value.trim(),delay:Math.max(100,Math.min(60000,Number(el.querySelector(".macroDelay").value)||1000))})).filter(x=>x.selector);const repeat_count=Math.max(1,Math.min(10000,Number($("#macroRepeat").value)||10));const interval_ms=Math.max(100,Math.min(60000,Number($("#macroInterval").value)||1000));try{await api("/api/support/macro",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({steps:list,repeat_count,interval_ms})});$("#macroRepeat").value=repeat_count;$("#macroInterval").value=interval_ms;toast("매크로 저장 완료");render()}catch(e){toast(e.message)}};
   $("#macroStop").onclick=()=>stopMacro();
   $("#macroStart").onclick=()=>startMacro(list);
   render();
+  loadMacro();
 }
 function stopMacro(){if(macroTimer){clearTimeout(macroTimer);macroTimer=null}macroRunning=false;toast("매크로 중지")}
 async function startMacro(list){
