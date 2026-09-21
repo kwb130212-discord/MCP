@@ -78,6 +78,162 @@ class Staff(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+
+
+class Supporter(Base):
+    __tablename__ = "supporters"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    label: Mapped[str] = mapped_column(String(64), default="지원자")
+    macro_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class GameAccount(Base):
+    __tablename__ = "game_accounts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supporter_id: Mapped[int | None] = mapped_column(ForeignKey("supporters.id", ondelete="SET NULL"), nullable=True, index=True)
+    username_enc: Mapped[str] = mapped_column(Text)
+    password_enc: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+SUPPORT_COOKIE = "cat_hero_support"
+GAME_ACCOUNT_KEY = os.environ.get("GAME_ACCOUNT_KEY", "")
+
+def support_hash(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+def account_fernet():
+    if not GAME_ACCOUNT_KEY:
+        raise RuntimeError("GAME_ACCOUNT_KEY is not configured")
+    from cryptography.fernet import Fernet
+    return Fernet(GAME_ACCOUNT_KEY.encode())
+
+def account_encrypt(value: str) -> str:
+    return account_fernet().encrypt(value.encode()).decode()
+
+def account_decrypt(value: str) -> str:
+    return account_fernet().decrypt(value.encode()).decode()
+
+def new_support_code() -> str:
+    return "CAT-" + secrets.token_urlsafe(12).replace("-", "").replace("_", "")[:16].upper()
+
+async def api_support_login(request: Request):
+    if rate_limited(client_key(request, "support-login"), LOGIN_LIMIT):
+        return json_error("요청이 너무 많습니다. 잠시 후 다시 시도하세요.", 429)
+    try:
+        code = clean_text(str((await request.json()).get("code") or ""), 32).upper()
+    except Exception:
+        return json_error("지원 코드를 확인하세요.", 401)
+    async with SessionLocal() as db:
+        supporter = await db.scalar(select(Supporter).where(Supporter.code_hash == support_hash(code), Supporter.active.is_(True)))
+        if not supporter:
+            return json_error("유효하지 않거나 비활성화된 지원 코드입니다.", 401)
+    response = JSONResponse({"ok": True, "macro_enabled": supporter.macro_enabled})
+    response.set_cookie(SUPPORT_COOKIE, code, max_age=60*60*24*30, httponly=True, samesite="lax", secure=request.url.scheme == "https")
+    return response
+
+async def current_supporter(request: Request):
+    code = request.cookies.get(SUPPORT_COOKIE)
+    if not code:
+        return None
+    async with SessionLocal() as db:
+        return await db.scalar(select(Supporter).where(Supporter.code_hash == support_hash(code), Supporter.active.is_(True)))
+
+async def api_support_me(request: Request):
+    supporter = await current_supporter(request)
+    if not supporter:
+        return json_error("supporter unauthorized", 401)
+    return JSONResponse({"id": supporter.id, "label": supporter.label, "macro_enabled": supporter.macro_enabled})
+
+async def api_support_account(request: Request):
+    supporter = await current_supporter(request)
+    if not supporter:
+        return json_error("supporter unauthorized", 401)
+    if not supporter.macro_enabled:
+        return json_error("매크로 권한이 비활성화되어 있습니다.", 403)
+    async with SessionLocal() as db:
+        account = await db.scalar(select(GameAccount).where(GameAccount.supporter_id == supporter.id, GameAccount.active.is_(True)).order_by(GameAccount.id.desc()))
+        if not account:
+            return JSONResponse({"account": None})
+        try:
+            username, password = account_decrypt(account.username_enc), account_decrypt(account.password_enc)
+        except Exception:
+            return json_error("계정 보안키 설정을 확인하세요.", 500)
+        return JSONResponse({"account": {"username": username, "password": password}})
+
+async def api_support_logout(request: Request):
+    if not csrf_ok(request) or not same_origin(request):
+        return json_error("invalid request", 403)
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(SUPPORT_COOKIE)
+    return response
+
+async def api_admin_supporters(request: Request):
+    if not await require_staff(request, admin_only=True):
+        return json_error("forbidden", 403)
+    async with SessionLocal() as db:
+        rows = (await db.execute(select(Supporter).order_by(Supporter.id.desc()))).scalars().all()
+        accounts = (await db.execute(select(GameAccount))).scalars().all()
+        assigned = {a.supporter_id for a in accounts if a.active and a.supporter_id is not None}
+        return JSONResponse({"supporters": [{"id": s.id, "label": s.label, "macro_enabled": s.macro_enabled, "active": s.active, "has_account": s.id in assigned, "created_at": s.created_at.isoformat()} for s in rows]})
+
+async def api_admin_supporter_create(request: Request):
+    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request, admin_only=True):
+        return json_error("forbidden", 403)
+    try:
+        data = await request.json()
+        label = clean_text(str(data.get("label") or "지원자"), 64)
+    except Exception:
+        return json_error("지원자 이름을 확인하세요.")
+    code = new_support_code()
+    async with SessionLocal() as db:
+        db.add(Supporter(code_hash=support_hash(code), label=label))
+        await db.commit()
+    return JSONResponse({"ok": True, "code": code}, status_code=201)
+
+async def api_admin_game_account_create(request: Request):
+    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request, admin_only=True):
+        return json_error("forbidden", 403)
+    try:
+        data = await request.json()
+        supporter_id = int(data.get("supporter_id"))
+        username = clean_text(str(data.get("username") or ""), 256)
+        password = str(data.get("password") or "")
+        if not password or len(username) > 256 or len(password) > 512:
+            raise ValueError
+        account_encrypt(username)
+        account_encrypt(password)
+    except Exception:
+        return json_error("계정 정보 또는 GAME_ACCOUNT_KEY를 확인하세요.")
+    async with SessionLocal() as db:
+        supporter = await db.get(Supporter, supporter_id)
+        if not supporter or not supporter.active:
+            return json_error("지원자를 찾을 수 없습니다.", 404)
+        old = (await db.execute(select(GameAccount).where(GameAccount.supporter_id == supporter.id, GameAccount.active.is_(True)))).scalars().all()
+        for account in old:
+            account.active = False
+        db.add(GameAccount(supporter_id=supporter.id, username_enc=account_encrypt(username), password_enc=account_encrypt(password)))
+        await db.commit()
+    return JSONResponse({"ok": True}, status_code=201)
+
+async def api_admin_supporter_toggle(request: Request):
+    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request, admin_only=True):
+        return json_error("forbidden", 403)
+    try:
+        supporter_id = int(request.path_params["supporter_id"])
+        active = bool((await request.json()).get("active"))
+    except Exception:
+        return json_error("상태를 확인하세요.")
+    async with SessionLocal() as db:
+        supporter = await db.get(Supporter, supporter_id)
+        if not supporter:
+            return json_error("지원자를 찾을 수 없습니다.", 404)
+        supporter.active = active
+        await db.commit()
+    return JSONResponse({"ok": True})
+
 class StaffSession(Base):
     __tablename__ = "staff_sessions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -437,6 +593,10 @@ routes = [
     Route("/", homepage),
     Route("/healthz", health),
     Route("/api/session", api_session),
+    Route("/api/support/login", api_support_login, methods=["POST"]),
+    Route("/api/support/logout", api_support_logout, methods=["POST"]),
+    Route("/api/support/me", api_support_me),
+    Route("/api/support/account", api_support_account),
     Route("/api/nickname", api_set_nickname, methods=["POST"]),
     Route("/api/posts", api_posts),
     Route("/api/posts", api_create_post, methods=["POST"]),
@@ -446,6 +606,10 @@ routes = [
     Route("/api/admin/logout", api_admin_logout, methods=["POST"]),
     Route("/api/admin/me", api_admin_me),
     Route("/api/admin/staff", api_staff_list),
+    Route("/api/admin/supporters", api_admin_supporters),
+    Route("/api/admin/supporters", api_admin_supporter_create, methods=["POST"]),
+    Route("/api/admin/supporters/{supporter_id:int}", api_admin_supporter_toggle, methods=["POST"]),
+    Route("/api/admin/game-accounts", api_admin_game_account_create, methods=["POST"]),
     Route("/api/admin/staff", api_staff_create, methods=["POST"]),
     Route("/api/admin/staff/{staff_id:int}/role", api_staff_role, methods=["POST"]),
     Route("/api/admin/posts", api_admin_posts),
