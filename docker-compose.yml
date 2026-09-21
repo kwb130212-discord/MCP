@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: cathero
       POSTGRES_USER: cathero
-      POSTGRES_PASSWORD: change-this-password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,15 +17,22 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://cathero:change-this-password@db:5432/cathero
-      MCP_TOKEN: replace-with-a-real-token
-      MCP_ALLOWED_HOSTS: 127.0.0.1:*
-      MCP_ALLOWED_ORIGINS: http://127.0.0.1:*
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      DATABASE_URL: ${DATABASE_URL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MCP_TOKEN: ${MCP_TOKEN}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-127.0.0.1:*,cathero.64bit.kr,cathero.64bit.kr:443}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-http://127.0.0.1:*,https://cathero.64bit.kr}
+      GAME_ACCOUNT_KEY: ${GAME_ACCOUNT_KEY}
       UPLOAD_DIR: /data/uploads
     volumes:
       - uploads:/data/uploads
     ports:
-      - "8000:8000"
+      - "10000:10000"
     depends_on:
       db:
         condition: service_healthy
