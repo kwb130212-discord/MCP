@@ -417,14 +417,13 @@ async def _rest_select(model, filters=(), limit=None, order=None):
     return rows
 
 async def _rest_query(query):
+    expr=query.column_descriptions[0].get("expr") if query.column_descriptions else None
+    if hasattr(expr, "name") and expr.name == "count":
+        model=query.column_descriptions[0]["entity"]
+        rows=await _rest_select(model,_postgrest_filters(query))
+        return [len(rows)]
     model=_model_class(query)
     if model is None:
-        expr=query.column_descriptions[0].get("expr") if query.column_descriptions else None
-        entity=getattr(query.column_descriptions[0],"entity",None) if query.column_descriptions else None
-        if hasattr(expr,"name") and expr.name=="count":
-            model=query.column_descriptions[0]["entity"]
-            rows=await _rest_select(model,_postgrest_filters(query))
-            return [len(rows)]
         raise RuntimeError("Unsupported Supabase query")
     rows=await _rest_select(model,_postgrest_filters(query),_query_limit(query),_query_order(query))
     return [_model_obj(model,row) for row in rows]
@@ -447,7 +446,7 @@ def _query_order(query):
 async def _rest_insert(model,data): return await _rest_request("POST",model.__tablename__,json=data)
 async def _rest_update(model,data,filters):
     params=[]
-    for field,op,value in filters: params.append((field,f"{op}.{value}"))
+    for field,op,value in filters: params.append((field,f"{op}.{str(value).lower() if isinstance(value,bool) else value}"))
     return await _rest_request("PATCH",model.__tablename__,params=params,json=data)
 async def _rest_delete(model,filters):
     params=[]
