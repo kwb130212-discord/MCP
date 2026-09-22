@@ -3,8 +3,8 @@ let csrf="",me={nickname:""},currentCategory="전체";const $=s=>document.queryS
     const me=await api("/api/admin/me"),posts=await api("/api/admin/posts");
     role=me.role;
     let html='<div class="adminHead"><div><p class="eyebrow">PRIVATE CONSOLE</p><h2>운영 패널</h2><div class="meta">'+esc(me.username)+' · '+esc(me.role)+'</div></div><button class="ghost" id="logoutBtn">로그아웃</button></div>';
-    if(role==="admin"){
-      html+='<section class="supportAdmin"><h3>지원자 / 계정 지급</h3><form id="supportCreateForm" class="staffForm"><input id="supportLabel" placeholder="지원자 이름" maxlength="64" required><button class="primary">지원 코드 발급</button></form><div id="supporterList" class="adminList"></div><form id="accountAssignForm" class="staffForm"><select id="accountSupporter" required><option value="">지원자 선택</option></select><input id="accountUser" placeholder="게임 계정 ID" required><input id="accountPass" type="password" placeholder="게임 계정 비밀번호" required><button class="primary">계정 지급</button></form></section><hr>';
+    if(role==="admin"||role==="operator"){
+      html+='<section class="supportAdmin"><h3>지원자 / 계정 지급</h3><form id="supportCreateForm" class="staffForm"><input id="supportLabel" placeholder="지원자 이름" maxlength="64" required><button class="primary">지원 코드 발급</button></form><div id="supporterList" class="adminList"></div>'+(role==="admin"?'<form id="accountAssignForm" class="staffForm"><select id="accountSupporter" required><option value="">지원자 선택</option></select><input id="accountUser" placeholder="게임 계정 ID" required><input id="accountPass" type="password" placeholder="게임 계정 비밀번호" required><button class="primary">계정 지급</button></form>':'')+'</section><hr>';
     }
     html+='<h3>게시글 관리</h3><div class="adminList">'+posts.posts.map(p=>'<div class="adminRow"><div><b>'+esc(p.title)+'</b><div class="meta">'+esc(p.nickname)+' · '+date(p.created_at)+'</div></div><button class="danger" onclick="deletePost('+p.id+')">삭제</button></div>').join("")+'</div>';
     if(role==="admin"){
@@ -13,7 +13,7 @@ let csrf="",me={nickname:""},currentCategory="전체";const $=s=>document.queryS
     }
     $("#adminPanel").innerHTML=html;
     $("#adminDialog").showModal();
-    if(role==="admin"){
+    if(role==="admin"||role==="operator"){
       await loadSupporters();
       $("#supportCreateForm").onsubmit=async e=>{
         e.preventDefault();
@@ -23,7 +23,8 @@ let csrf="",me={nickname:""},currentCategory="전체";const $=s=>document.queryS
           e.target.reset(); toast("지원 코드 발급 완료"); await loadSupporters();
         }catch(x){toast(x.message)}
       };
-      $("#accountAssignForm").onsubmit=async e=>{
+      const accountForm=$("#accountAssignForm");
+      if(accountForm)accountForm.onsubmit=async e=>{
         e.preventDefault();
         try{
           await api("/api/admin/game-accounts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({supporter_id:$("#accountSupporter").value,username:$("#accountUser").value,password:$("#accountPass").value})});
@@ -43,7 +44,7 @@ let csrf="",me={nickname:""},currentCategory="전체";const $=s=>document.queryS
   }catch(x){toast(x.message)}
 }
 async function deletePost(id){if(!confirm("이 게시글을 삭제할까요?"))return;try{await api("/api/admin/posts/"+id,{method:"DELETE"});toast("삭제 완료");adminPanel(me.role)}catch(x){toast(x.message)}}async function changeRole(id,role){try{await api("/api/admin/staff/"+id+"/role",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({role})});toast("권한 변경 완료")}catch(x){toast(x.message)}}$("#supportBtn").onclick=async()=>{try{await api("/api/support/me");await supportPanel()}catch{$("#supportDialog").showModal()}};$("#supportLoginForm").onsubmit=async e=>{e.preventDefault();try{await api("/api/support/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:$("#supportCode").value})});$("#supportDialog").close();await supportPanel();toast("지원자 인증 완료")}catch(x){toast(x.message)}};$("#themeBtn").onclick=toggleTheme;$("#writeBtn").onclick=()=>$("#writeDialog").showModal();$("#refreshBtn").onclick=load;$("#nickBtn").onclick=()=>$("#nickDialog").showModal();$("#adminBtn").onclick=async()=>{try{const d=await api("/api/admin/me");adminPanel(d.role)}catch{$("#loginDialog").showModal()}};$("#loginForm").onsubmit=adminLogin;document.addEventListener("click",e=>{if(e.target.matches("[data-close]"))e.target.closest("dialog").close()});$("#nickForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/nickname",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nickname:$("#nickInput").value})});me.nickname=d.nickname;$("#nickDialog").close();toast("닉네임 저장 완료")}catch(x){toast(x.message)}};$("#postForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/posts",{method:"POST",body:new FormData(e.target)});$("#writeDialog").close();e.target.reset();toast("게시글 등록 완료");await load();openPost(d.id)}catch(x){toast(x.message)}};window.openPost=openPost;window.addComment=addComment;window.deletePost=deletePost;window.changeRole=changeRole;document.querySelectorAll(".category").forEach(b=>b.onclick=async()=>{document.querySelectorAll(".category").forEach(x=>x.classList.remove("active"));b.classList.add("active");currentCategory=b.dataset.category;await load()});theme();(async()=>{try{await session();await load()}catch(e){toast(e.message)}})();
-async function supportPanel(){try{const m=await api("/api/support/me"),a=await api("/api/support/account");let account=a.account;$("#supportPanel").innerHTML='<div class="adminHead"><div><p class="eyebrow">SUPPORT ACCESS</p><h2>지원자 전용 센터</h2><div class="meta">'+esc(m.label)+'</div></div><button class="ghost" id="supportLogout">로그아웃</button></div><div class="macroHero"><div><span class="categoryTag">AUTHORIZED</span><h3>캣히어로 웹 매크로</h3><p class="muted">지급된 지원 계정으로 이용하는 전용 도구입니다.</p></div><button class="primary" id="macroOpen">매크로 설정</button></div>'+(account?'<div class="accountCard"><div><b>지급 계정</b><div class="meta">계정 정보는 서버에서 보호된 형태로 저장됩니다.</div></div><button class="ghost" id="showAccount">계정 보기</button></div>':'<div class="card">아직 지급된 게임 계정이 없습니다.</div>');$("#supportPanelDialog").showModal();$("#supportLogout").onclick=async()=>{await api("/api/support/logout",{method:"POST"});$("#supportPanelDialog").close();toast("지원자 로그아웃 완료")};$("#showAccount")?.addEventListener("click",()=>toast("계정 ID: "+account.username+" / 비밀번호: "+account.password));$("#macroOpen").onclick=()=>openMacroSettings()}catch(e){$("#supportDialog").showModal()}}
+async function supportPanel(){try{const m=await api("/api/support/me"),a=await api("/api/support/account");let account=a.account;$("#supportPanel").innerHTML='<div class="adminHead"><div><p class="eyebrow">SUPPORT ACCESS</p><h2>지원자 전용 센터</h2><div class="meta">'+esc(m.label)+'</div></div><button class="ghost" id="supportLogout">로그아웃</button></div><div class="macroHero"><div><span class="categoryTag">AUTHORIZED</span><h3>캣히어로 웹 매크로</h3><p class="muted">지급된 지원 계정으로 이용하는 전용 도구입니다.</p></div><button class="primary" id="macroOpen">매크로 설정</button></div>'+(account?'<div class="accountCard"><div><b>지급 계정</b><div class="meta">계정 정보는 서버에서 보호된 형태로 저장됩니다.</div></div><button class="ghost" id="showAccount">계정 보기</button></div>':'<div class="card">아직 지급된 게임 계정이 없습니다.</div>');$("#supportPanelDialog").showModal();$("#supportLogout").onclick=async()=>{await api("/api/support/logout",{method:"POST"});$("#supportPanelDialog").close();toast("지원자 로그아웃 완료")};$("#showAccount")?.addEventListener("click",()=>toast("계정 ID: "+account.username+" / 비밀번호는 서버에서 보호됩니다."));$("#macroOpen").onclick=()=>openMacroSettings()}catch(e){$("#supportDialog").showModal()}}
 let macroTimer=null,macroRunning=false;
 function openMacroSettings(){
   $("#supportPanel").innerHTML='<div class="dialogHead"><div><p class="eyebrow">CAT HERO MACRO</p><h2>웹 매크로</h2></div><button class="x" data-close>×</button></div><div class="macroGrid"><label>반복 간격(ms)<input id="macroInterval" type="number" min="100" max="60000" value="1000"></label><label>반복 횟수<input id="macroRepeat" type="number" min="1" max="10000" value="10"></label></div><div class="macroSteps" id="macroSteps"></div><button class="ghost" id="addMacroStep">＋ 클릭 대상 추가</button><div class="actions"><button class="ghost" id="macroReset">초기화</button><button class="ghost" id="macroStop">중지</button><button class="primary" id="macroSave">저장</button><button class="primary" id="macroStart">실행</button></div><p class="muted">현재 페이지에서 지정한 CSS 선택자를 순서대로 클릭합니다. 외부 도메인 게임이나 Canvas 내부 클릭은 브라우저 보안상 이 페이지에서 직접 제어할 수 없습니다.</p>';
@@ -71,7 +72,8 @@ async function startMacro(list){
   for(let n=0;n<repeat&&macroRunning;n++){
     for(const step of list){
       if(!macroRunning)break;
-      const el=document.querySelector(step.selector);
+      let el;
+      try{el=document.querySelector(step.selector)}catch(e){stopMacro();toast("CSS 선택자가 올바르지 않습니다: "+step.selector);return}
       if(!el){stopMacro();toast("클릭 대상을 찾을 수 없습니다: "+step.selector);return}
       el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}));
       await new Promise(r=>{macroTimer=setTimeout(r,Math.max(100,Number(step.delay)||interval))});
