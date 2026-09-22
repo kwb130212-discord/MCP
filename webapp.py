@@ -166,10 +166,10 @@ async def api_support_account(request: Request):
         if not account:
             return JSONResponse({"account": None})
         try:
-            username, password = account_decrypt(account.username_enc), account_decrypt(account.password_enc)
+            username = account_decrypt(account.username_enc)
         except Exception:
             return json_error("계정 보안키 설정을 확인하세요.", 500)
-        return JSONResponse({"account": {"username": username, "password": password}})
+        return JSONResponse({"account": {"username": username, "password_configured": True}})
 
 async def api_support_macro(request: Request):
     supporter = await current_supporter(request)
@@ -225,7 +225,7 @@ async def api_support_logout(request: Request):
     return response
 
 async def api_admin_supporters(request: Request):
-    if not await require_staff(request, admin_only=True):
+    if not await require_staff(request):
         return json_error("forbidden", 403)
     async with SessionLocal() as db:
         rows = (await db.execute(select(Supporter).order_by(Supporter.id.desc()))).scalars().all()
@@ -234,7 +234,7 @@ async def api_admin_supporters(request: Request):
         return JSONResponse({"supporters": [{"id": s.id, "label": s.label, "macro_enabled": s.macro_enabled, "active": s.active, "has_account": s.id in assigned, "created_at": s.created_at.isoformat()} for s in rows]})
 
 async def api_admin_supporter_create(request: Request):
-    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request, admin_only=True):
+    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request):
         return json_error("forbidden", 403)
     try:
         data = await request.json()
@@ -273,7 +273,7 @@ async def api_admin_game_account_create(request: Request):
     return JSONResponse({"ok": True}, status_code=201)
 
 async def api_admin_supporter_toggle(request: Request):
-    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request, admin_only=True):
+    if not csrf_ok(request) or not same_origin(request) or not await require_staff(request):
         return json_error("forbidden", 403)
     try:
         supporter_id = int(request.path_params["supporter_id"])
@@ -318,9 +318,19 @@ async def startup():
         if not staff:
             db.add(Staff(username=ADMIN_USERNAME, password_hash=configured_hash, role="admin"))
             await db.commit()
-        elif staff.role != "admin" or not staff.active:
-            staff.role, staff.active = "admin", True
-            await db.commit()
+        else:
+            changed = False
+            if staff.role != "admin" or not staff.active:
+                staff.role, staff.active = "admin", True
+                changed = True
+            if ADMIN_PASSWORD_HASH and not secrets.compare_digest(staff.password_hash, ADMIN_PASSWORD_HASH):
+                staff.password_hash = ADMIN_PASSWORD_HASH
+                changed = True
+            elif ADMIN_PASSWORD and not ADMIN_PASSWORD_HASH and not verify_password(ADMIN_PASSWORD, staff.password_hash):
+                staff.password_hash = hash_password(ADMIN_PASSWORD)
+                changed = True
+            if changed:
+                await db.commit()
 
 def json_error(message: str, status: int = 400):
     return JSONResponse({"error": message}, status_code=status)
