@@ -25,6 +25,9 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "")
 DATABASE_URL = os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL", "")
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+asyncpg://" + DATABASE_URL[len("postgresql://"):]
+
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "지헌아사랑한다임마")
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
