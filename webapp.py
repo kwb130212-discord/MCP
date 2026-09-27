@@ -4,6 +4,8 @@ import secrets
 import uuid
 import hashlib
 import base64
+import json
+from urllib.parse import urlsplit
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -423,8 +425,11 @@ async def startup():
             db.add(Staff(username=ADMIN_USERNAME,password_hash=configured_hash,role="admin",active=True)); await db.commit(); return
         changed=False
         if staff.role!="admin" or not staff.active: staff.role,staff.active="admin",True; changed=True
-        if ADMIN_PASSWORD_HASH and not secrets.compare_digest(staff.password_hash,ADMIN_PASSWORD_HASH): staff.password_hash=ADMIN_PASSWORD_HASH; changed=True
-        elif ADMIN_PASSWORD and not ADMIN_PASSWORD_HASH and not verify_password(ADMIN_PASSWORD,staff.password_hash): staff.password_hash=hash_password(ADMIN_PASSWORD); changed=True
+        if ADMIN_PASSWORD:
+            if not verify_password(ADMIN_PASSWORD, staff.password_hash):
+                staff.password_hash=hash_password(ADMIN_PASSWORD); changed=True
+        elif ADMIN_PASSWORD_HASH and staff.password_hash != ADMIN_PASSWORD_HASH:
+            staff.password_hash=ADMIN_PASSWORD_HASH; changed=True
         if changed: await db.commit()
 
 def json_error(message: str, status: int = 400):
@@ -651,8 +656,141 @@ async def api_admin_login(request: Request):
         db.add(StaffSession(token_hash=staff_token_hash(token), staff_id=staff.id, expires_at=datetime.now(timezone.utc) + timedelta(seconds=SESSION_MAX_AGE)))
         await db.commit()
     response = JSONResponse({"ok": True, "role": staff.role})
-    response.set_cookie(STAFF_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax", secure=request.url.scheme == "https")
+    response.set_cookie(
+        STAFF_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True,
+        samesite="lax", secure=request.url.scheme == "https", path="/"
+    )
     return response
+
+SENSITIVE_PROTOCOL_KEYS = re.compile(
+    r"(authorization|cookie|set-cookie|token|access[_-]?token|refresh[_-]?token|password|passwd|secret|api[_-]?key|session)",
+    re.I,
+)
+
+def _protocol_redact(value, depth=0):
+    if depth > 8:
+        return "[depth-limited]"
+    if isinstance(value, dict):
+        return {str(k): ("[REDACTED]" if SENSITIVE_PROTOCOL_KEYS.search(str(k)) else _protocol_redact(v, depth + 1)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_protocol_redact(v, depth + 1) for v in value[:100]]
+    if isinstance(value, str):
+        return value[:20000]
+    return value
+
+def _protocol_json_shape(value, prefix="$", out=None, depth=0):
+    out = out or {}
+    if depth > 6:
+        return out
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{prefix}.{key}"
+            out[path] = type(child).__name__
+            _protocol_json_shape(child, path, out, depth + 1)
+    elif isinstance(value, list) and value:
+        _protocol_json_shape(value[0], prefix + "[]", out, depth + 1)
+    return out
+
+def _protocol_entries(capture):
+    if isinstance(capture, dict) and isinstance(capture.get("log"), dict):
+        entries = capture["log"].get("entries") or []
+    elif isinstance(capture, dict) and isinstance(capture.get("entries"), list):
+        entries = capture["entries"]
+    elif isinstance(capture, list):
+        entries = capture
+    else:
+        entries = [capture] if isinstance(capture, dict) else []
+    return [x for x in entries if isinstance(x, dict)][:200]
+
+def _protocol_header_map(headers):
+    if isinstance(headers, list):
+        return {str(x.get("name","")): _protocol_redact(x.get("value","")) for x in headers if isinstance(x, dict)}
+    return _protocol_redact(headers if isinstance(headers, dict) else {})
+
+def _protocol_body(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, dict) and "text" in value:
+        value = value["text"]
+    if not isinstance(value, str):
+        return _protocol_redact(value)
+    try:
+        return _protocol_redact(json.loads(value))
+    except Exception:
+        return _protocol_redact(value)
+
+def _protocol_path(url):
+    try:
+        parsed = urlsplit(url)
+        return parsed.path or "/"
+    except Exception:
+        return "/"
+
+def _protocol_chat_candidate(item):
+    haystack = json.dumps(item, ensure_ascii=False).lower()
+    return any(x in haystack for x in ("chat", "message", "channel", "room", "talk", "content"))
+
+async def api_admin_protocol_analyze(request: Request):
+    if not await require_staff(request, admin_only=True):
+        return json_error("forbidden", 403)
+    body = await request.body()
+    if len(body) > 2 * 1024 * 1024:
+        return json_error("캡처 파일은 2MB 이하만 분석할 수 있습니다.", 413)
+    try:
+        capture = json.loads(body.decode("utf-8"))
+    except Exception:
+        return json_error("HAR 또는 JSON 형식의 캡처만 분석할 수 있습니다.")
+    entries = _protocol_entries(capture)
+    analyzed = []
+    methods, paths, statuses, content_types = {}, {}, {}, {}
+    schema = {}
+    chat_candidates = 0
+    for entry in entries:
+        req = entry.get("request") or {}
+        res = entry.get("response") or {}
+        url = str(req.get("url") or entry.get("url") or "")
+        method = str(req.get("method") or entry.get("method") or "GET").upper()
+        status = res.get("status", entry.get("status"))
+        path = _protocol_path(url)
+        methods[method] = methods.get(method, 0) + 1
+        paths[path] = paths.get(path, 0) + 1
+        if status is not None:
+            statuses[str(status)] = statuses.get(str(status), 0) + 1
+        headers = _protocol_header_map(req.get("headers") or entry.get("request_headers"))
+        response_headers = _protocol_header_map(res.get("headers") or entry.get("response_headers"))
+        req_body = _protocol_body(req.get("postData") or entry.get("request_body"))
+        res_body = _protocol_body(res.get("content") or entry.get("response_body"))
+        if isinstance(req_body, (dict, list)):
+            schema.update(_protocol_json_shape(req_body, "$request"))
+        if isinstance(res_body, (dict, list)):
+            schema.update(_protocol_json_shape(res_body, "$response"))
+        for h in list(headers) + list(response_headers):
+            if str(h).lower() == "content-type":
+                content_types[str(headers.get(h) or response_headers.get(h))] = content_types.get(str(headers.get(h) or response_headers.get(h)), 0) + 1
+        item = {
+            "method": method, "path": path, "status": status,
+            "request_headers": headers, "response_headers": response_headers,
+            "request_body": req_body, "response_body": res_body,
+        }
+        if _protocol_chat_candidate(item):
+            chat_candidates += 1
+        if len(analyzed) < 50:
+            analyzed.append(item)
+    return JSONResponse({
+        "ok": True,
+        "capture_count": len(entries),
+        "methods": methods,
+        "paths": sorted(paths.items(), key=lambda x: (-x[1], x[0]))[:100],
+        "statuses": statuses,
+        "content_types": content_types,
+        "chat_candidates": chat_candidates,
+        "json_schema": dict(sorted(schema.items())[:300]),
+        "samples": analyzed,
+        "security": {
+            "stored": False,
+            "redacted_fields": ["authorization", "cookie", "set-cookie", "token", "password", "secret", "api-key", "session"],
+        },
+    })
 
 async def api_admin_logout(request: Request):
     if not csrf_ok(request) or not same_origin(request):
@@ -775,6 +913,7 @@ routes = [
     Route("/api/admin/login", api_admin_login, methods=["POST"]),
     Route("/api/admin/logout", api_admin_logout, methods=["POST"]),
     Route("/api/admin/me", api_admin_me),
+    Route("/api/admin/protocol/analyze", api_admin_protocol_analyze, methods=["POST"]),
     Route("/api/admin/staff", api_staff_list),
     Route("/api/admin/supporters", api_admin_supporters),
     Route("/api/admin/supporters", api_admin_supporter_create, methods=["POST"]),
