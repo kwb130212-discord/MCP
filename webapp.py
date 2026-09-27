@@ -317,7 +317,13 @@ class _RestSession:
         obj=_model_obj(model,rows[0]) if rows else None
         if obj: self.loaded[(model,getattr(obj,pk))]=obj
         return obj
-    async def scalar(self,query): return (await self.execute(query)).first()
+    async def scalar(self,query):
+        result=await self.execute(query)
+        obj=result.first()
+        if obj and hasattr(obj,"__table__"):
+            pk=list(obj.__table__.primary_key.columns)[0].name
+            self.loaded[(type(obj),getattr(obj,pk))]=obj
+        return obj
     async def execute(self,query): return _RestResult(await _rest_query(query))
     async def refresh(self,obj):
         pk=list(obj.__table__.primary_key.columns)[0].name; rows=await _rest_select(type(obj),[(pk,"eq",getattr(obj,pk))],limit=1)
