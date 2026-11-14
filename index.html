@@ -18,7 +18,7 @@
 <div class="summary" id="summary">총 0회 기록</div>
 <section class="history"><h2>최근 기록</h2><div class="log" id="log">기록 없음</div></section>
 <div class="tools"><button id="undo">마지막 기록 취소</button><button id="reset">초기화</button></div>
-<div class="hint">목표: 1번 9승 이상 · 2번 9승 이상 · 3번 3승 이하 (각 10회)</div>
+<div class="hint">목표: 1번은 10번 중 9승 · 2번은 성공 횟수 제한 없음 · 3번은 10번 중 3승 이하</div>
 </main>
 <script>
 const KEY="stone-auto-priority-v3";
@@ -29,14 +29,14 @@ function wins(i){return state.items[i].filter(Boolean).length}
 function choose(){
  // 1번을 최우선, 달성 후 2번, 마지막으로 3번을 낮게 유지한다.
  if(state.items[0].length<10 && wins(0)<9)return 0;
- if(state.items[1].length<10 && wins(1)<9)return 1;
+ if(state.items[1].length<10)return 1;
  if(state.items[2].length<10)return 2;
  return -1;
 }
 function explain(i){
  if(i<0)return "모든 항목의 10회 기록이 끝났어.";
  if(i===0)return "좋은 옵션이야. 10번 안에 성공 9번을 목표로 먼저 진행해.";
- if(i===1)return "1번 목표를 마쳤어. 이제 서브 옵션을 9승 목표로 진행해.";
+ if(i===1)return "2번은 성공 횟수 제한이 없어. 남은 기회 동안 편하게 기록하면 돼.";
  return wins(2)<=3?"3번은 성공을 더 만들지 말고 실패 쪽으로 관리해.":"3번 성공이 3회를 넘었어. 남은 시도는 실패를 목표로 해.";
 }
 function render(){
