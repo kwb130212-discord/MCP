@@ -2,127 +2,61 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f4f1e9">
-<title>냥혼석 세공 기록</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7f7f5">
+<title>세공 기록</title>
 <style>
-:root{--paper:#f4f1e9;--sheet:#fffdf8;--ink:#292c29;--muted:#77786f;--line:#e5e0d5;--green:#526c58;--green-pale:#e9eee7;--red:#a45e52;--red-pale:#f5e9e5;--gold:#b28a4b}
-*{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Noto Sans KR","Malgun Gothic",sans-serif}
-main{width:min(920px,100% - 32px);margin:0 auto;padding:30px 0 56px}
-header{display:flex;justify-content:space-between;align-items:center;padding:0 2px 18px;border-bottom:1px solid #d9d3c7}
-.brand{font-size:15px;font-weight:800;letter-spacing:-.04em}.brand span{color:var(--green);font-weight:500}
-.edition{font-size:12px;color:var(--muted)}
-.intro{padding:34px 2px 26px}
-.eyebrow{font-size:12px;letter-spacing:.12em;color:var(--green);font-weight:700}
-h1{font-size:clamp(28px,5vw,39px);letter-spacing:-.065em;line-height:1.22;margin:9px 0 10px;font-weight:800}
-.intro p{color:var(--muted);margin:0;max-width:560px}
-.sheet{background:var(--sheet);border:1px solid var(--line);border-radius:9px;padding:22px;margin-bottom:14px;box-shadow:0 3px 12px #423b2b08}
-.section-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:16px}
-.section-head h2{font-size:16px;margin:0;letter-spacing:-.04em}
-.section-head small{color:var(--muted);font-size:12px}
-.target-list{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-.target{background:#fff;border:1px solid var(--line);border-radius:7px;padding:13px 14px;text-align:left;color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s}
-.target:hover{border-color:#9aa994}
-.target.selected{border:1.5px solid var(--green);background:var(--green-pale)}
-.target .num{font-size:12px;color:var(--muted)}
-.target strong{display:block;font-size:16px;margin-top:2px}
-.target .status{display:block;font-size:12px;color:var(--muted);margin-top:5px}
-.target.selected .status{color:var(--green)}
-.progress-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:20px}
-.progress-title{font-weight:700;font-size:14px}.progress-meta{font-size:12px;color:var(--muted)}
-.track{height:7px;background:#eeeae1;border-radius:10px;overflow:hidden;margin-top:9px}
-.track i{display:block;height:100%;background:var(--green);border-radius:10px;transition:width .2s}
-.target-note{margin-top:15px;padding:12px 14px;background:#f7f6f0;border-left:3px solid var(--green);font-size:13px;color:#55594f}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:17px;border-top:1px solid var(--line);padding-top:15px}
-.stat{padding:0 14px;border-right:1px solid var(--line)}.stat:first-child{padding-left:0}.stat:last-child{border:0}
-.stat small{display:block;color:var(--muted);font-size:12px}.stat strong{font-size:22px;letter-spacing:-.04em}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
-button{font:inherit;cursor:pointer}
-.record{border:0;border-radius:7px;padding:13px 12px;font-weight:750}
-.record:disabled{opacity:.35;cursor:not-allowed}
-.win{background:var(--green);color:white}.lose{background:var(--red-pale);color:#854c43}
-.small-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
-.text-btn{border:0;background:transparent;color:var(--muted);font-size:12px;padding:5px 2px;text-decoration:underline;text-underline-offset:3px}
-.lower{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
-.rows{display:grid;gap:0}
-.item-row{display:grid;grid-template-columns:65px 1fr auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
-.item-row:last-child{border:0}
-.item-name{font-weight:700;font-size:13px}.item-count{font-size:13px;color:var(--muted)}
-.level-pill{font-size:11px;border-radius:4px;padding:3px 7px;background:#f0eee7;color:#666}
-.level-pill.done{background:var(--green-pale);color:var(--green)}
-.log{max-height:245px;overflow:auto}
-.log-entry{display:grid;grid-template-columns:46px 1fr auto;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12px}
-.log-entry:last-child{border:0}
-.result{font-weight:700}.result.ok{color:var(--green)}.result.no{color:var(--red)}
-.empty{color:var(--muted);font-size:13px;padding:12px 0}
-.rules{font-size:13px;color:#686a62;margin:0;padding-left:18px}.rules li{padding:3px 0}
-.footer{display:flex;justify-content:space-between;gap:12px;align-items:center;color:#929087;font-size:11px;padding:14px 3px}
-@media(max-width:640px){main{width:calc(100% - 24px);padding-top:19px}.intro{padding:27px 2px 20px}.sheet{padding:17px}.target-list{gap:6px}.target{padding:11px 9px}.target strong{font-size:14px}.target .status{font-size:11px}.lower{grid-template-columns:1fr}.stats{gap:0}.stat{padding:0 9px}.stat strong{font-size:19px}.progress-row{margin-top:17px}}
+*{box-sizing:border-box}body{margin:0;background:#f7f7f5;color:#222;font:15px/1.5 system-ui,-apple-system,"Noto Sans KR",sans-serif}main{max-width:520px;margin:0 auto;padding:26px 18px 40px}header{font-size:13px;color:#777;border-bottom:1px solid #ddd;padding-bottom:13px}.hero{padding:26px 0 20px}h1{font-size:27px;letter-spacing:-1.2px;margin:0 0 5px}.sub{color:#777;font-size:13px}.recommend{background:#222;color:#fff;border-radius:8px;padding:20px;margin:8px 0 14px}.recommend small{color:#bbb}.recommend strong{display:block;font-size:32px;line-height:1.2;margin:5px 0}.recommend p{font-size:13px;color:#ccc;margin:8px 0 0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.item{background:#fff;border:1px solid #e1e1dd;border-radius:7px;padding:12px 9px;text-align:center}.item b{display:block;font-size:18px}.item span{font-size:11px;color:#777}.item.active{border:2px solid #222;padding:11px 8px}.item.done{background:#ededeb}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:15px 0}.actions button{border:0;border-radius:7px;padding:15px;font-size:15px;font-weight:700}.ok{background:#253e2e;color:white}.fail{background:#eee;color:#333}.actions button:disabled{opacity:.3}.summary{font-size:12px;color:#777;margin:10px 0 18px}.history{border-top:1px solid #ddd;padding-top:13px}.history h2{font-size:14px;margin:0 0 8px}.log{font-size:12px;color:#666;max-height:150px;overflow:auto}.log div{padding:5px 0;border-bottom:1px solid #ececea}.tools{display:flex;justify-content:space-between;margin-top:16px}.tools button{background:none;border:0;color:#888;text-decoration:underline;font-size:12px;padding:4px}.hint{font-size:12px;color:#888;margin-top:16px}@media(min-width:600px){main{padding-top:40px}}
 </style>
 </head>
-<body>
-<main>
-<header><div class="brand">냥혼석 <span>· 세공 기록장</span></div><div class="edition">PERSONAL TOOL / 01</div></header>
-<section class="intro"><div class="eyebrow">작업 메모</div><h1>오늘 세공은<br>어느 쪽부터 할까?</h1><p>목표 번호를 하나 정해두면 그 항목을 먼저 진행해. 결과를 기록하면서 남은 횟수와 확률을 같이 확인할 수 있어.</p></section>
-
-<section class="sheet">
- <div class="section-head"><h2>01. 이번 목표</h2><small>번호를 누르면 바로 적용돼</small></div>
- <div class="target-list" id="targets">
-  <button class="target selected" data-target="0"><span class="num">TARGET 01</span><strong>1번 항목</strong><span class="status">우선 진행 중</span></button>
-  <button class="target" data-target="1"><span class="num">TARGET 02</span><strong>2번 항목</strong><span class="status">대기 중</span></button>
-  <button class="target" data-target="2"><span class="num">TARGET 03</span><strong>3번 항목</strong><span class="status">대기 중</span></button>
- </div>
- <div class="progress-row"><div><div class="progress-title" id="focusTitle">1번 항목 진행 상황</div><div class="track"><i id="focusBar" style="width:0%"></i></div></div><div class="progress-meta" id="focusCount">0 / 10회</div></div>
- <div class="target-note" id="advice">목표로 선택한 1번 항목을 우선 진행해. 아래 성공 또는 실패를 누르면 이 항목에 결과가 기록돼.</div>
- <div class="stats">
-  <div class="stat"><small>현재 성공 확률</small><strong id="prob">75%</strong></div>
-  <div class="stat"><small>전체 진행</small><strong id="total">0 / 30</strong></div>
-  <div class="stat"><small>전체 성공</small><strong id="wins">0회</strong></div>
- </div>
- <div class="actions"><button class="record win" id="success">성공했어</button><button class="record lose" id="failure">실패했어</button></div>
- <div class="small-actions"><button class="text-btn" id="undo">마지막 기록 되돌리기</button></div>
-</section>
-
-<div class="lower">
- <section class="sheet"><div class="section-head"><h2>02. 항목별 기록</h2><small>각 항목 최대 10회</small></div><div class="rows" id="itemRows"></div></section>
- <section class="sheet"><div class="section-head"><h2>03. 최근 기록</h2><small>최신순</small></div><div class="log" id="log"><div class="empty">아직 기록이 없어. 첫 결과를 입력해 봐.</div></div></section>
-</div>
-<section class="sheet"><div class="section-head"><h2>세공 규칙 메모</h2><small>현재 설정</small></div><ul class="rules"><li>시작 성공 확률은 75%야.</li><li>성공하면 다음 확률이 10%p 내려가고, 실패하면 10%p 올라가.</li><li>확률은 25%에서 75% 사이로 유지돼.</li><li>9승 이상은 3레벨, 7승 이상은 2레벨, 4승 이상은 1레벨로 표시해.</li></ul>
- <div class="small-actions"><button class="text-btn" id="export">기록 CSV로 저장</button><button class="text-btn" id="reset">전체 기록 초기화</button></div>
-</section>
-<footer class="footer"><span>냥혼석 세공 기록장</span><span>기록은 이 브라우저에 자동 저장돼.</span></footer>
+<body><main>
+<header>개인 세공 기록 · 자동 추천</header>
+<section class="hero"><h1>다음은 어디를 올릴까?</h1><div class="sub">성공 / 실패만 기록하면 다음 번호를 자동으로 골라줘.</div></section>
+<section class="recommend"><small>다음 강화 추천</small><strong id="next">1번</strong><p id="reason">1번 좋은 옵션을 먼저 목표로 진행해.</p></section>
+<section class="grid" id="items"></section>
+<div class="actions"><button class="ok" id="success">성공</button><button class="fail" id="failure">실패</button></div>
+<div class="summary" id="summary">총 0회 기록</div>
+<section class="history"><h2>최근 기록</h2><div class="log" id="log">기록 없음</div></section>
+<div class="tools"><button id="undo">마지막 기록 취소</button><button id="reset">초기화</button></div>
+<div class="hint">목표: 1번 9승 이상 · 2번 9승 이상 · 3번 3승 이하 (각 10회)</div>
 </main>
 <script>
-const names=["1번 항목","2번 항목","3번 항목"];
-const KEY="nyanghon-stone-notes-v2";
-let state={p:75,target:0,items:[[],[],[]],history:[]};
+const KEY="stone-auto-priority-v3";
+const labels=["1번 · 좋은 옵션","2번 · 서브 옵션","3번 · 안 좋은 옵션"];
+let state={items:[[],[],[]],history:[]};
 const $=id=>document.getElementById(id);
-function level(n){return n>=9?3:n>=7?2:n>=4?1:0}
-function load(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.items)&&saved.items.length===3){state={...state,...saved};state.items=state.items.map(x=>Array.isArray(x)?x.slice(0,10):[]);state.target=Math.max(0,Math.min(2,Number(state.target)||0));}}catch(e){}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
-function render(){
- const total=state.items.reduce((n,a)=>n+a.length,0);
- const wins=state.items.reduce((n,a)=>n+a.filter(Boolean).length,0);
- const chosen=state.items[state.target], count=chosen.length, won=chosen.filter(Boolean).length;
- $("prob").textContent=state.p+"%";$("total").textContent=total+" / 30";$("wins").textContent=wins+"회";
- $("focusTitle").textContent=names[state.target]+" 진행 상황";$("focusCount").textContent=count+" / 10회";$("focusBar").style.width=(count*10)+"%";
- document.querySelectorAll("[data-target]").forEach(btn=>{const i=Number(btn.dataset.target),n=state.items[i].length,w=state.items[i].filter(Boolean).length;btn.classList.toggle("selected",i===state.target);btn.querySelector(".status").textContent=i===state.target?"우선 진행 중":n>=10?"기록 완료":level(w)===3?"3레벨 달성":"대기 중"});
- if(count>=10){$("advice").textContent=level(won)===3?"목표 달성! "+names[state.target]+"에서 3레벨을 만들었어. 다른 번호를 목표로 바꿔도 돼.":"이 항목의 10회 기록이 끝났어. 현재 "+level(won)+"레벨이야. 다른 번호를 선택할 수 있어."}
- else if(level(won)===3){$("advice").textContent="현재 "+names[state.target]+" 목표를 달성했어. 더 진행할지, 다른 번호로 목표를 바꿀지 선택하면 돼."}
- else{$("advice").textContent="지금은 "+names[state.target]+"이 우선이야. 성공 또는 실패를 기록하면 다음에도 이 번호가 선택된 상태로 남아."}
- $("success").disabled=count>=10||total>=30;$("failure").disabled=count>=10||total>=30;$("undo").disabled=state.history.length===0;
- $("itemRows").innerHTML=state.items.map((a,i)=>{const w=a.filter(Boolean).length,l=level(w);return '<div class="item-row"><div class="item-name">'+names[i]+'</div><div class="item-count">'+w+'승 '+(a.length-w)+'패 · '+a.length+'/10회</div><span class="level-pill '+(l===3?'done':'')+'">'+(l?l+"레벨":"진행 중")+'</span></div>'}).join("");
- $("log").innerHTML=state.history.length?state.history.slice().reverse().slice(0,40).map(h=>'<div class="log-entry"><span class="result '+(h.ok?"ok":"no")+'">'+(h.ok?"성공":"실패")+'</span><span>'+names[h.i]+' · '+h.before+'% → '+h.after+'%</span><span class="item-count">'+h.iCount+'/10</span></div>').join(""):'<div class="empty">아직 기록이 없어. 첫 결과를 입력해 봐.</div>';
- save();
+function wins(i){return state.items[i].filter(Boolean).length}
+function choose(){
+ // 1번을 최우선, 달성 후 2번, 마지막으로 3번을 낮게 유지한다.
+ if(state.items[0].length<10 && wins(0)<9)return 0;
+ if(state.items[1].length<10 && wins(1)<9)return 1;
+ if(state.items[2].length<10 && wins(2)>3)return 2;
+ if(state.items[2].length<10)return 2;
+ if(state.items[0].length<10)return 0;
+ if(state.items[1].length<10)return 1;
+ return -1;
 }
-$("targets").addEventListener("click",e=>{const b=e.target.closest("[data-target]");if(!b)return;state.target=Number(b.dataset.target);render()});
-function record(ok){const i=state.target;if(state.items[i].length>=10||state.items.reduce((n,a)=>n+a.length,0)>=30)return;const before=state.p;state.items[i].push(ok);state.p=Math.max(25,Math.min(75,state.p+(ok?-10:10)));state.history.push({i,ok,before,after:state.p,iCount:state.items[i].length});render()}
+function explain(i){
+ if(i<0)return "모든 항목의 10회 기록이 끝났어.";
+ if(i===0)return "좋은 옵션이야. 10번 안에 성공 9번을 목표로 먼저 진행해.";
+ if(i===1)return "1번 목표를 마쳤어. 이제 서브 옵션을 9승 목표로 진행해.";
+ return wins(2)<=3?"3번은 성공을 더 만들지 말고 실패 쪽으로 관리해.":"3번 성공이 3회를 넘었어. 남은 시도는 실패를 목표로 해.";
+}
+function render(){
+ const i=choose(),total=state.items.reduce((n,a)=>n+a.length,0);
+ $("next").textContent=i<0?"완료":(i+1)+"번";
+ $("reason").textContent=explain(i);
+ $("items").innerHTML=state.items.map((a,n)=>'<div class="item '+(n===i?"active ":"")+(a.length===10?"done":"")+'"><b>'+wins(n)+'승 '+(a.length-wins(n))+'패</b><span>'+labels[n]+'</span><span>'+a.length+'/10회</span></div>').join("");
+ $("success").disabled=i<0||state.items[i].length>=10|| (i===2&&wins(2)>=3);
+ $("failure").disabled=i<0||state.items[i].length>=10;
+ $("summary").textContent="총 "+total+" / 30회 기록 · 목표 1번 9승 / 2번 9승 / 3번 3승 이하";
+ $("log").innerHTML=state.history.length?state.history.slice().reverse().slice(0,25).map(h=>'<div>'+(h.i+1)+'번 · '+(h.ok?"성공":"실패")+' · '+h.wins+'승 '+h.losses+'패</div>').join(""):"기록 없음";
+ try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+}
+function record(ok){const i=choose();if(i<0)return;if(i===2&&ok&&wins(2)>=3)return;state.items[i].push(ok);state.history.push({i,ok,wins:wins(i),losses:state.items[i].length-wins(i)});render()}
 $("success").onclick=()=>record(true);$("failure").onclick=()=>record(false);
-$("undo").onclick=()=>{const h=state.history.pop();if(!h)return;state.items[h.i].pop();state.p=h.before;state.target=h.i;render()};
-$("reset").onclick=()=>{if(confirm("저장된 세공 기록을 전부 지울까?")){state={p:75,target:0,items:[[],[],[]],history:[]};render()}};
-$("export").onclick=()=>{const lines=["항목,순서,결과,시도 전 확률,시도 후 확률"];state.history.forEach(h=>lines.push(names[h.i]+","+h.iCount+","+(h.ok?"성공":"실패")+","+h.before+"%,"+h.after+"%"));const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv;charset=utf-8"}));a.download="냥혼석-세공기록.csv";a.click();URL.revokeObjectURL(a.href)};
-load();render();
-</script>
-</body>
-</html>
+$("undo").onclick=()=>{const h=state.history.pop();if(!h)return;state.items[h.i].pop();render()};
+$("reset").onclick=()=>{if(confirm("기록을 전부 초기화할까?")){state={items:[[],[],[]],history:[]};render()}};
+try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.items)&&s.items.length===3&&Array.isArray(s.history))state=s}catch(e){}
+render();
+</script></body></html>
