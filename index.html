@@ -1,59 +1,61 @@
 <!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f7f7f5">
-<title>세공 기록</title>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#fff">
+<title>세공 도우미</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f7f7f5;color:#222;font:15px/1.5 system-ui,-apple-system,"Noto Sans KR",sans-serif}main{max-width:520px;margin:0 auto;padding:26px 18px 40px}header{font-size:13px;color:#777;border-bottom:1px solid #ddd;padding-bottom:13px}.hero{padding:26px 0 20px}h1{font-size:27px;letter-spacing:-1.2px;margin:0 0 5px}.sub{color:#777;font-size:13px}.recommend{background:#222;color:#fff;border-radius:8px;padding:20px;margin:8px 0 14px}.recommend small{color:#bbb}.recommend strong{display:block;font-size:32px;line-height:1.2;margin:5px 0}.recommend p{font-size:13px;color:#ccc;margin:8px 0 0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.item{background:#fff;border:1px solid #e1e1dd;border-radius:7px;padding:12px 9px;text-align:center}.item b{display:block;font-size:18px}.item span{font-size:11px;color:#777}.item.active{border:2px solid #222;padding:11px 8px}.item.done{background:#ededeb}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:15px 0}.actions button{border:0;border-radius:7px;padding:15px;font-size:15px;font-weight:700}.ok{background:#253e2e;color:white}.fail{background:#eee;color:#333}.actions button:disabled{opacity:.3}.summary{font-size:12px;color:#777;margin:10px 0 18px}.history{border-top:1px solid #ddd;padding-top:13px}.history h2{font-size:14px;margin:0 0 8px}.log{font-size:12px;color:#666;max-height:150px;overflow:auto}.log div{padding:5px 0;border-bottom:1px solid #ececea}.tools{display:flex;justify-content:space-between;margin-top:16px}.tools button{background:none;border:0;color:#888;text-decoration:underline;font-size:12px;padding:4px}.hint{font-size:12px;color:#888;margin-top:16px}@media(min-width:600px){main{padding-top:40px}}
-</style>
-</head>
+*{box-sizing:border-box}body{margin:0;background:#fff;color:#111;font-family:Arial,"Noto Sans KR",sans-serif}main{max-width:980px;margin:0 auto;padding:28px 24px 42px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:54px}select,.toolbtn,.action{font:inherit;background:#fff;border:2px solid #888;border-radius:8px;color:#111;box-shadow:0 1px 2px #00000012}select,.toolbtn{height:52px;padding:0 17px;font-size:21px}.toolbtn{cursor:pointer}.toolbtn.on{background:#222;color:#fff;border-color:#222}.rows{display:grid;gap:42px}.stone-row{display:grid;grid-template-columns:54px 1fr;column-gap:15px;align-items:center}.letter{font-size:34px;font-weight:700;text-align:center}.stones{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:7px;align-items:center}.diamond{width:100%;aspect-ratio:1;max-width:43px;justify-self:center;border:2px solid var(--tone);transform:rotate(45deg);background:#fff;position:relative}.diamond.success{background:var(--tone)}.diamond.failure{background:#fff;position:relative}.diamond.failure:after{content:"";position:absolute;left:45%;top:-3px;width:2px;height:calc(100% + 4px);background:var(--tone);transform:rotate(-90deg)}.row-a{--tone:#253fe0}.row-b{--tone:#168329}.row-c{--tone:#e52b20}.controls{grid-column:2;display:flex;gap:10px;align-items:center;margin-top:26px;flex-wrap:wrap}.action{font-size:22px;padding:10px 22px;min-width:104px;cursor:pointer}.action:active,.toolbtn:active{transform:translateY(1px)}.recommend{font-size:25px;font-weight:800;margin-left:10px}.row-meta{font-size:13px;color:#777;margin-left:auto}.stone-row.active .letter{ text-decoration:underline;text-underline-offset:7px}.stone-row.active .recommend{color:#111}.stone-row.inactive .recommend{display:none}.bottom{display:flex;justify-content:space-between;gap:10px;margin-top:35px;color:#777;font-size:13px}.bottom button{border:0;background:none;color:#777;text-decoration:underline;font-size:13px;cursor:pointer}.hint{margin-top:22px;color:#888;font-size:12px;line-height:1.7}
+@media(max-width:600px){main{padding:20px 12px}.toolbar{gap:7px;margin-bottom:40px}select,.toolbtn{height:43px;padding:0 10px;font-size:16px}.rows{gap:36px}.stone-row{grid-template-columns:28px 1fr;column-gap:8px}.letter{font-size:26px}.stones{gap:5px}.diamond{max-width:25px;border-width:1.5px}.controls{grid-column:2;gap:6px;margin-top:20px}.action{min-width:0;padding:8px 12px;font-size:16px}.recommend{font-size:20px;margin-left:3px}.row-meta{width:100%;margin:2px 0 0}.bottom{margin-top:28px}}
+</style></head>
 <body><main>
-<header>개인 세공 기록 · 자동 추천</header>
-<section class="hero"><h1>다음은 어디를 올릴까?</h1><div class="sub">성공 / 실패만 기록하면 다음 번호를 자동으로 골라줘.</div></section>
-<section class="recommend"><small>다음 강화 추천</small><strong id="next">1번</strong><p id="reason">1번 좋은 옵션을 먼저 목표로 진행해.</p></section>
-<section class="grid" id="items"></section>
-<div class="actions"><button class="ok" id="success">성공</button><button class="fail" id="failure">실패</button></div>
-<div class="summary" id="summary">총 0회 기록</div>
-<section class="history"><h2>최근 기록</h2><div class="log" id="log">기록 없음</div></section>
-<div class="tools"><button id="undo">마지막 기록 취소</button><button id="reset">초기화</button></div>
-<div class="hint">목표: 1번은 10번 중 9승 · 2번은 성공 횟수 제한 없음 · 3번은 10번 중 3승 이하</div>
+<div class="toolbar">
+<select id="slots" aria-label="시도 횟수"><option value="10">10칸</option><option value="8">8칸</option><option value="12">12칸</option></select>
+<button class="toolbtn" id="reset">초기화</button>
+<button class="toolbtn on" id="auto">자동</button>
+<select id="chance" aria-label="성공 확률"><option value="75">75%</option><option value="70">70%</option><option value="65">65%</option><option value="60">60%</option><option value="55">55%</option><option value="50">50%</option><option value="45">45%</option><option value="40">40%</option><option value="35">35%</option><option value="30">30%</option><option value="25">25%</option></select>
+</div>
+<div class="rows" id="rows"></div>
+<div class="bottom"><span id="summary">A 0/10 · B 0/10 · C 0/10</span><button id="undo">마지막 기록 취소</button></div>
+<div class="hint">목표 설정 · A: 10번 중 9번 성공 / B: 제한 없음 / C: 성공 3번 이하<br>성공·실패는 직접 기록하고, 세공 버튼은 설정한 확률로 결과를 생성해.</div>
 </main>
 <script>
-const KEY="stone-auto-priority-v3";
-const labels=["1번 · 좋은 옵션","2번 · 서브 옵션","3번 · 안 좋은 옵션"];
-let state={items:[[],[],[]],history:[]};
+const KEY="stone-visual-tracker-v4",letters=["A","B","C"],labels=["좋은 옵션","서브 옵션","안 좋은 옵션"];
+let state={slots:10,chance:75,auto:true,rows:[[],[],[]],history:[]};
 const $=id=>document.getElementById(id);
-function wins(i){return state.items[i].filter(Boolean).length}
-function choose(){
- // 1번을 최우선, 달성 후 2번, 마지막으로 3번을 낮게 유지한다.
- if(state.items[0].length<10 && wins(0)<9)return 0;
- if(state.items[1].length<10)return 1;
- if(state.items[2].length<10)return 2;
+function wins(i){return state.rows[i].filter(x=>x==="S").length}
+function nextRow(){
+ if(state.rows[0].length<state.slots&&wins(0)<9)return 0;
+ if(state.rows[1].length<state.slots)return 1;
+ if(state.rows[2].length<state.slots)return 2;
+ if(state.rows[0].length<state.slots)return 0;
  return -1;
 }
-function explain(i){
- if(i<0)return "모든 항목의 10회 기록이 끝났어.";
- if(i===0)return "좋은 옵션이야. 10번 안에 성공 9번을 목표로 먼저 진행해.";
- if(i===1)return "2번은 성공 횟수 제한이 없어. 남은 기회 동안 편하게 기록하면 돼.";
- return wins(2)<=3?"3번은 성공을 더 만들지 말고 실패 쪽으로 관리해.":"3번 성공이 3회를 넘었어. 남은 시도는 실패를 목표로 해.";
+function add(i,result){
+ if(i<0||state.rows[i].length>=state.slots)return;
+ if(i===2&&result==="S"&&wins(2)>=3)return;
+ state.rows[i].push(result);state.history.push({i,result});render();
 }
 function render(){
- const i=choose(),total=state.items.reduce((n,a)=>n+a.length,0);
- $("next").textContent=i<0?"완료":(i+1)+"번";
- $("reason").textContent=explain(i);
- $("items").innerHTML=state.items.map((a,n)=>'<div class="item '+(n===i?"active ":"")+(a.length===10?"done":"")+'"><b>'+wins(n)+'승 '+(a.length-wins(n))+'패</b><span>'+labels[n]+'</span><span>'+a.length+'/10회</span></div>').join("");
- $("success").disabled=i<0||state.items[i].length>=10|| (i===2&&wins(2)>=3);
- $("failure").disabled=i<0||state.items[i].length>=10;
- $("summary").textContent="총 "+total+" / 30회 기록 · 목표 1번 9승 / 2번 9승 / 3번 3승 이하";
- $("log").innerHTML=state.history.length?state.history.slice().reverse().slice(0,25).map(h=>'<div>'+(h.i+1)+'번 · '+(h.ok?"성공":"실패")+' · '+h.wins+'승 '+h.losses+'패</div>').join(""):"기록 없음";
+ const current=nextRow();
+ $("rows").innerHTML=letters.map((letter,i)=>{
+ const arr=state.rows[i],w=wins(i),isCurrent=i===current,blocked=i===2&&w>=3;
+ const diamonds=Array.from({length:state.slots},(_,n)=>'<span class="diamond '+(arr[n]==="S"?"success":arr[n]==="F"?"failure":"")+'"></span>').join("");
+ const recommendation=isCurrent?(i===0?"추천!":i===1?"진행 가능":"추천!"):"";
+ return '<section class="stone-row row-'+letter.toLowerCase()+' '+(isCurrent?"active":"inactive")+'"><div class="letter">'+letter+'</div><div class="stones">'+diamonds+'</div><div class="controls"><button class="action" data-act="S" data-row="'+i+'">성공</button><button class="action" data-act="F" data-row="'+i+'">실패</button><button class="action" data-act="R" data-row="'+i+'">세공</button><span class="recommend">'+recommendation+'</span><span class="row-meta">'+labels[i]+' · '+w+'승 '+(arr.length-w)+'패 · '+arr.length+'/'+state.slots+(blocked?" · 성공 제한":"")+'</span></div></section>';
+ }).join("");
+ $("summary").textContent=letters.map((l,i)=>l+" "+state.rows[i].length+"/"+state.slots).join(" · ");
+ $("slots").value=String(state.slots);$("chance").value=String(state.chance);$("auto").classList.toggle("on",state.auto);$("auto").textContent=state.auto?"자동":"수동";
  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
 }
-function record(ok){const i=choose();if(i<0)return;if(i===2&&ok&&wins(2)>=3)return;state.items[i].push(ok);state.history.push({i,ok,wins:wins(i),losses:state.items[i].length-wins(i)});render()}
-$("success").onclick=()=>record(true);$("failure").onclick=()=>record(false);
-$("undo").onclick=()=>{const h=state.history.pop();if(!h)return;state.items[h.i].pop();render()};
-$("reset").onclick=()=>{if(confirm("기록을 전부 초기화할까?")){state={items:[[],[],[]],history:[]};render()}};
-try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.items)&&s.items.length===3&&Array.isArray(s.history))state=s}catch(e){}
+$("rows").addEventListener("click",e=>{
+ const b=e.target.closest("[data-act]");if(!b)return;
+ let i=Number(b.dataset.row),act=b.dataset.act;
+ if(act==="R"){if(state.auto)i=nextRow();if(i<0)return;add(i,Math.random()*100<state.chance?"S":"F")}
+ else add(i,act);
+});
+$("slots").onchange=()=>{state.slots=Number($("slots").value);state.rows=state.rows.map(a=>a.slice(0,state.slots));state.history=state.history.filter((h)=>state.rows[h.i].length);render()};
+$("chance").onchange=()=>{state.chance=Number($("chance").value);render()};
+$("auto").onclick=()=>{state.auto=!state.auto;render()};
+$("reset").onclick=()=>{if(confirm("모든 세공 기록을 초기화할까?")){state.rows=[[],[],[]];state.history=[];render()}};
+$("undo").onclick=()=>{const h=state.history.pop();if(!h)return;state.rows[h.i].pop();render()};
+try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.rows)&&saved.rows.length===3){state={...state,...saved};state.slots=[8,10,12].includes(state.slots)?state.slots:10;state.rows=state.rows.map(a=>Array.isArray(a)?a.slice(0,state.slots):[]);}}catch(e){}
 render();
 </script></body></html>
