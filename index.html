@@ -30,10 +30,7 @@ function choose(){
  // 1번을 최우선, 달성 후 2번, 마지막으로 3번을 낮게 유지한다.
  if(state.items[0].length<10 && wins(0)<9)return 0;
  if(state.items[1].length<10 && wins(1)<9)return 1;
- if(state.items[2].length<10 && wins(2)>3)return 2;
  if(state.items[2].length<10)return 2;
- if(state.items[0].length<10)return 0;
- if(state.items[1].length<10)return 1;
  return -1;
 }
 function explain(i){
